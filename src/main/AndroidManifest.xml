@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Receive the agent's vendor-signal broadcasts (we only care about DI_VEHICLE_SPEED). The
+         permission is DEFINED by the injector app (install it first); we only hold it. -->
+    <uses-permission android:name="co.screenmate.can.permission.SIGNALS" />
+    <!-- Ongoing notification for the foreground service on Android 13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Re-arm the background service after a reboot (car power cycle). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Adjusting the media stream volume. Normal protection => auto-granted. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Loopback only: CanTx reaches the box's own root adbd at 127.0.0.1:5555 to run SmCanTx
+         (left-scroll volume). Same transport the injector uses. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- NOTE: FOREGROUND_SERVICE[_CONNECTED_DEVICE] + CHANGE_NETWORK_STATE (the FGS-type gate) are
+         merged in from the :privileged-client library manifest. -->
+
+    <application
+        android:label="Speed Volume"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".SettingsActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Background host: owns the CAN client and drives the media volume from vehicle speed.
+             connectedDevice = its input is live data from the vehicle. -->
+        <service
+            android:name=".VolumeControlService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- Auto-start on boot (car power-on) so it runs without opening the app. Gated at runtime
+             by the user's "start on boot" setting. -->
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Quick Settings tile: toggle the whole feature on/off from the shade. -->
+        <service
+            android:name=".SpeedVolumeTileService"
+            android:exported="true"
+            android:icon="@android:drawable/ic_lock_silent_mode_off"
+            android:label="Speed Volume"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
