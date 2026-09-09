@@ -18,6 +18,7 @@ class CurveView(context: Context) : View(context) {
 
     private var minSpeed = VolumeSettings.DEF_MIN_SPEED
     private var maxSpeed = VolumeSettings.DEF_MAX_SPEED
+    private var unit = VolumeSettings.DEF_SPEED_UNIT
     private var maxBoost = VolumeSettings.DEF_MAX_BOOST
     private var curve = VolumeSettings.DEF_CURVE
     private var speed: Float? = null
@@ -43,10 +44,11 @@ class CurveView(context: Context) : View(context) {
 
     fun set(
         minSpeed: Int, maxSpeed: Int, maxBoost: Int, curve: SpeedVolumeMapper.Curve,
-        speed: Float?, target: Int, held: Int,
+        speed: Float?, target: Int, held: Int, unit: SpeedUnit = VolumeSettings.DEF_SPEED_UNIT,
     ) {
         this.minSpeed = minSpeed; this.maxSpeed = maxSpeed; this.maxBoost = maxBoost
         this.curve = curve; this.speed = speed; this.target = target; this.held = held
+        this.unit = unit
         invalidate()
     }
 
@@ -91,9 +93,9 @@ class CurveView(context: Context) : View(context) {
         listOf(minSpeed, maxSpeed).forEach { s ->
             val x = sx(s.toFloat())
             canvas.drawLine(x, padT, x, padT + h, guide)
-            canvas.drawText("$s", x - 8f * d, height - 5f * d, label)
+            canvas.drawText("${unit.fromKmh(s)}", x - 8f * d, height - 5f * d, label)
         }
-        canvas.drawText("km/h", padL + w - 30f * d, height - 5f * d, label)
+        canvas.drawText(unit.label, padL + w - 30f * d, height - 5f * d, label)
 
         // Live marker: vertical line at current speed, a filled dot at the target boost, and a
         // smaller ring at what we're currently holding (so you see it slew toward the target).

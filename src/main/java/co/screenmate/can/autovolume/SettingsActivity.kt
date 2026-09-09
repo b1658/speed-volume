@@ -49,6 +49,8 @@ class SettingsActivity : Activity() {
     private lateinit var pauseChip: TextView
     private lateinit var scrollChip: TextView
     private lateinit var audioChip: TextView
+    private lateinit var unitKmhChip: TextView
+    private lateinit var unitMphChip: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -175,8 +177,9 @@ class SettingsActivity : Activity() {
                 speed == null -> append("No vehicle speed yet — install/open the Injector app so the " +
                     "agent is running, then drive.")
                 else -> {
+                    val u = settings.speedUnit
                     val gearStr = if (gear == Signals.GEAR_DRIVE) "D" else gear?.toString() ?: "–"
-                    append("%.0f km/h   ·   gear %s\n".format(speed, gearStr))
+                    append("%.0f %s   ·   gear %s\n".format(u.fromKmh(speed), u.label, gearStr))
                     append("boost  +%d steps held   (target +%d)\n".format(held, target))
                     val via = if (settings.backend == WriteBackend.SCROLL) "left scroll wheel" else "Android audio"
                     append("via $via")
@@ -188,7 +191,7 @@ class SettingsActivity : Activity() {
         }
 
         curve.set(settings.minSpeedKmh, settings.maxSpeedKmh, settings.maxBoostSteps, settings.curve,
-            speed, target, held)
+            speed, target, held, settings.speedUnit)
     }
 
     private fun postRefresh() = curve.postDelayed({ refresh() }, 150)
@@ -214,10 +217,12 @@ class SettingsActivity : Activity() {
             addView(slider("Louder at top speed", settings.maxBoostSteps, 0, 30, "steps") {
                 settings.maxBoostSteps = it; refresh()
             })
-            addView(slider("Boost starts at", settings.minSpeedKmh, 0, 160, "km/h") {
+            addView(rowLabel("Speed units"))
+            addView(unitSelector())
+            addView(speedSlider("Boost starts at", settings.minSpeedKmh, 0, 160) {
                 settings.minSpeedKmh = it; refresh()
             })
-            addView(slider("Full boost at", settings.maxSpeedKmh, 0, 200, "km/h") {
+            addView(speedSlider("Full boost at", settings.maxSpeedKmh, 0, 200) {
                 settings.maxSpeedKmh = it; refresh()
             })
         })
@@ -274,6 +279,33 @@ class SettingsActivity : Activity() {
     private fun updateBackendChips() {
         styleSeg(scrollChip, settings.backend == WriteBackend.SCROLL)
         styleSeg(audioChip, settings.backend == WriteBackend.ANDROID_AUDIO)
+    }
+
+    private fun unitSelector(): View {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(4), 0, dp(4)) }
+        unitKmhChip = segChip("km/h", settings.speedUnit == SpeedUnit.KMH) { setUnit(SpeedUnit.KMH) }
+        unitMphChip = segChip("mph", settings.speedUnit == SpeedUnit.MPH) { setUnit(SpeedUnit.MPH) }
+        row.addView(unitKmhChip, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = dp(6) })
+        row.addView(unitMphChip, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = dp(6) })
+        return row
+    }
+
+    /** Persist the chosen unit and rebuild the screen so sliders/labels/curve redraw in it. */
+    private fun setUnit(u: SpeedUnit) {
+        if (settings.speedUnit == u) return
+        settings.speedUnit = u
+        recreate()
+    }
+
+    /**
+     * A speed slider that shows/edits in the user's chosen unit while storing canonical km/h. The
+     * km/h bounds are converted for display, and the user's value is converted back on change.
+     */
+    private fun speedSlider(labelText: String, initialKmh: Int, minKmh: Int, maxKmh: Int, onChangeKmh: (Int) -> Unit): View {
+        val u = settings.speedUnit
+        return slider(labelText, u.fromKmh(initialKmh), u.fromKmh(minKmh), u.fromKmh(maxKmh), u.label) { shown ->
+            onChangeKmh(u.toKmh(shown))
+        }
     }
 
     // ----------------------------------------------------------- view helpers ----

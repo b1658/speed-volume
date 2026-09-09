@@ -13,6 +13,22 @@ enum class WriteBackend {
 }
 
 /**
+ * Display unit for speed values in the UI. Storage stays canonical km/h (what DI_VEHICLE_SPEED and
+ * [SpeedVolumeMapper] use), so switching units only re-labels/converts the sliders and readouts.
+ */
+enum class SpeedUnit(val label: String, val perKmh: Float) {
+    KMH("km/h", 1f),
+    MPH("mph", 1f / 1.609344f);
+
+    /** Canonical km/h -> value shown in this unit (rounded to a whole number for sliders). */
+    fun fromKmh(kmh: Int): Int = Math.round(kmh * perKmh)
+    /** Canonical km/h -> value shown in this unit (float, for the live readout). */
+    fun fromKmh(kmh: Float): Float = kmh * perKmh
+    /** Value shown in this unit -> canonical km/h (rounded). */
+    fun toKmh(shown: Int): Int = Math.round(shown / perKmh)
+}
+
+/**
  * User-tunable configuration for speed-dependent volume, persisted in [SharedPreferences].
  *
  * The model mirrors BMW's "Speed-Volume Control", but because the LEFT scroll wheel is a *relative*
@@ -32,6 +48,12 @@ class VolumeSettings(private val prefs: SharedPreferences) {
         get() = runCatching { WriteBackend.valueOf(prefs.getString(K_BACKEND, DEF_BACKEND.name)!!) }
             .getOrDefault(DEF_BACKEND)
         set(v) = prefs.edit().putString(K_BACKEND, v.name).apply()
+
+    /** Display unit for speed in the UI (km/h or mph). Storage stays km/h. */
+    var speedUnit: SpeedUnit
+        get() = runCatching { SpeedUnit.valueOf(prefs.getString(K_SPEED_UNIT, DEF_SPEED_UNIT.name)!!) }
+            .getOrDefault(DEF_SPEED_UNIT)
+        set(v) = prefs.edit().putString(K_SPEED_UNIT, v.name).apply()
 
     /** Speed at/below which no boost is added (you hear exactly your own volume). */
     var minSpeedKmh: Int
@@ -114,9 +136,11 @@ class VolumeSettings(private val prefs: SharedPreferences) {
         const val DEF_WIN_BOOST = 3
         val DEF_CURVE = SpeedVolumeMapper.Curve.PERCEPTUAL
         val DEF_BACKEND = WriteBackend.SCROLL
+        val DEF_SPEED_UNIT = SpeedUnit.KMH
 
         private const val K_ENABLED = "enabled"
         private const val K_BACKEND = "backend"
+        private const val K_SPEED_UNIT = "speed_unit"
         private const val K_MIN_SPEED = "min_speed"
         private const val K_MAX_SPEED = "max_speed"
         private const val K_MAX_BOOST = "max_boost"
